@@ -186,8 +186,8 @@ CREATE TABLE IF NOT EXISTS t_drain_work_order (
   site_no varchar(64) DEFAULT NULL COMMENT '修单所压泵站编号(在办/退回单挂着的站,巡检自动派单本轮往后推)',
   stage int DEFAULT NULL COMMENT '当前环节 0..4',
   status int DEFAULT NULL COMMENT '作业单状态 0在办 1办结确认 2退回重办',
-  content varchar(255) DEFAULT NULL COMMENT '推进记录',
-  last_action varchar(64) DEFAULT NULL COMMENT '最近一次推进动作',
+  content varchar(2000) DEFAULT NULL COMMENT '推进记录(当前有效流水的镜像;真身在t_drain_work_order_trail,退回作废的旧档记录不挂在这)',
+  last_action varchar(64) DEFAULT NULL COMMENT '最近一次推进动作 1推进 2退回 3开单',
   del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
   create_by varchar(64) DEFAULT NULL COMMENT '创建者',
   create_time datetime DEFAULT NULL COMMENT '创建时间',
@@ -197,3 +197,27 @@ CREATE TABLE IF NOT EXISTS t_drain_work_order (
   PRIMARY KEY (id),
   KEY idx_site_open (site_no, status, del_flag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='排涝抢险作业单';
+
+-- 作业单逐档流水：谁把单子挪进哪一档、什么时刻挪的，一笔一痕可一级级倒盘。
+-- 退回重办：退回去的那一档里写过的内容一律置 valid=0 作废，库内留着但不再算数，
+-- 绝不与重办后的新记录并排挂在同一张单上（单据 content 只镜像 valid=1 的流水）。
+CREATE TABLE IF NOT EXISTS t_drain_work_order_trail (
+  id bigint NOT NULL COMMENT '主键',
+  order_id bigint NOT NULL COMMENT '作业单主键 t_drain_work_order.id',
+  biz_no varchar(64) DEFAULT NULL COMMENT '作业单号(冗余便于台账倒查)',
+  stage_no int NOT NULL COMMENT '进入的环节 0接单 1到场布防 2处置 3撤场 4办结销号',
+  action int NOT NULL COMMENT '动作 1推进 2退回 3开单',
+  operator varchar(64) NOT NULL COMMENT '经办人登录名',
+  opinion varchar(500) DEFAULT NULL COMMENT '本档记下的一笔(处置措施/退回缘由)',
+  happen_time datetime NOT NULL COMMENT '经办时刻',
+  valid_flag int NOT NULL DEFAULT 1 COMMENT '是否有效 1有效 0已作废(被退回的那一档旧记)',
+  seq_no int NOT NULL COMMENT '单据全局时序(倒查排序用)',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_order_seq (order_id, seq_no),
+  KEY idx_order_valid (order_id, valid_flag, stage_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='排涝抢险作业单逐档流水';

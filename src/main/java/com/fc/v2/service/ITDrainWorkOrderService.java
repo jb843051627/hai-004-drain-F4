@@ -4,14 +4,18 @@ import java.util.List;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fc.v2.model.auto.TDrainWorkOrder;
+import com.fc.v2.model.auto.TDrainWorkOrderTrail;
 
 /**
- * 排涝抢险作业单 Service接口（state-machine 形状：单据流转，不提供增删改查全套）
+ * 排涝抢险作业单 Service接口（state-machine 形状：单据逐档流转，不提供增删改查全套）
  *
  * @author fuce
  * @date 2026-09-14
  */
 public interface ITDrainWorkOrderService {
+
+    /** 接点开单：落在接单档(0)，压站校验，返回已开单据 */
+    TDrainWorkOrder open(String siteNo, String operator, String opinion);
 
     /** 按主键查询单据 */
     TDrainWorkOrder selectTDrainWorkOrderById(Long id);
@@ -19,15 +23,15 @@ public interface ITDrainWorkOrderService {
     /** 列表查询（流转台账） */
     List<TDrainWorkOrder> selectTDrainWorkOrderList(QueryWrapper<TDrainWorkOrder> queryWrapper);
 
-    /** 推进一档：返回更新后的单据；被拒返回 null */
-    TDrainWorkOrder advance(Long id, String remark);
+    /** 逐档流水倒盘：作废笔也翻得到，valid_flag 标明哪笔已作废 */
+    List<TDrainWorkOrderTrail> trail(Long id);
 
-    /** 回退一档：返回更新后的单据；被拒返回 null */
-    TDrainWorkOrder rollback(Long id, String remark);
+    /** 推进一档：把经办人与时刻写进单里；跨档/同档二挪/办结后再动一律拒 */
+    TDrainWorkOrder advance(Long id, String operator, String opinion);
 
-    /** 修改内容：已办结不得再改，被拒返回 false */
-    boolean updateContent(Long id, String remark);
+    /** 撤回前一档重办：退回档旧记一律作废，不与重办新记并排；被拒抛业务异常 */
+    TDrainWorkOrder rollback(Long id, String operator, String opinion);
 
-    /** 删除单据：已办结不得删除，被拒返回 false */
+    /** 删除单据：办结销号后不许整单抹掉，被拒抛业务异常 */
     boolean remove(Long id);
 }

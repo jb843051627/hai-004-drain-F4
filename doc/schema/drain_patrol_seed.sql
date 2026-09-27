@@ -22,12 +22,24 @@ VALUES
 ON DUPLICATE KEY UPDATE shift_name = VALUES(shift_name), start_at = VALUES(start_at),
  end_at = VALUES(end_at), duty_user = VALUES(duty_user), status = 0, del_flag = 0;
 
--- 压在 PS02 上没销的修单（在办 0）：该站巡检本轮后推
+-- 压在 PS02 上没销的修单（在办 0，当前在到场布防档）：该站巡检本轮后推
 INSERT INTO t_drain_work_order (id, biz_no, site_no, stage, status, content, last_action, del_flag, create_by, create_time, remark)
 VALUES
- (2001, 'WX-OPEN-02', 'PS02', 1, 0, '2026-09-25 10:00:00 推进至环节1：控制柜受潮待修', '巡检发现', 0, 'seed', NOW(), '未销修单，压着 PS02')
+ (2001, 'WX-OPEN-02', 'PS02', 1, 0,
+  CONCAT('2026-09-25 09:30:00 接单开单 经办人duty_wang：巡检发现控制柜受潮', CHAR(10),
+  '2026-09-25 10:00:00 推进至到场布防 经办人duty_wang：围蔽到位待修'),
+  '1', 0, 'seed', NOW(), '未销修单，压着 PS02')
 ON DUPLICATE KEY UPDATE biz_no = VALUES(biz_no), site_no = VALUES(site_no),
- status = VALUES(status), del_flag = 0;
+ stage = VALUES(stage), status = VALUES(status), content = VALUES(content),
+ last_action = VALUES(last_action), del_flag = 0;
+
+-- 修单逐档流水：开单(接单)+推进至到场布防两笔有效记录，与单据 content 镜像同源
+INSERT INTO t_drain_work_order_trail (id, order_id, biz_no, stage_no, action, operator, opinion, happen_time, valid_flag, seq_no, create_by, create_time)
+VALUES
+ (92001, 2001, 'WX-OPEN-02', 0, 3, 'duty_wang', '巡检发现控制柜受潮', '2026-09-25 09:30:00', 1, 1, 'seed', NOW()),
+ (92002, 2001, 'WX-OPEN-02', 1, 1, 'duty_wang', '围蔽到位待修',       '2026-09-25 10:00:00', 1, 2, 'seed', NOW())
+ON DUPLICATE KEY UPDATE biz_no = VALUES(biz_no), stage_no = VALUES(stage_no),
+ action = VALUES(action), valid_flag = VALUES(valid_flag);
 
 -- 待派巡检条目（status=0）
 INSERT INTO t_drain_patrol_task (id, item_no, site_no, due_at, amount, status, del_flag, create_by, create_time, remark)

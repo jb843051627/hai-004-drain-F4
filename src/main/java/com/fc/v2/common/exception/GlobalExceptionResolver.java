@@ -119,6 +119,15 @@ public class GlobalExceptionResolver{
     }
 
     /**
+     * 排涝抢险作业单流转业务规则异常（跨档抢挪、同档二挪、办结销号后再动、整单抹除等红线）
+     */
+    @ExceptionHandler(DrainWorkOrderException.class)
+    public AjaxResult drainWorkOrderException(DrainWorkOrderException e)
+    {
+        return AjaxResult.error(e.getMessage());
+    }
+
+    /**
      * 温/湿度断传人工补录业务规则异常（未断传却手补、非温湿度表计、重复补、抄表时刻顶替等红线）
      */
     @ExceptionHandler(DrainMeterSupplementException.class)

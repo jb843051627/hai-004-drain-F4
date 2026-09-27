@@ -51,14 +51,14 @@ public class TDrainWorkOrder implements Serializable {
     @ApiModelProperty(value = "作业单状态 0在办 1办结确认 2退回重办")
     private Integer status;
 
-    /** 推进记录 */
+    /** 推进记录(当前有效流水的镜像;真身在t_drain_work_order_trail,退回作废的旧档记录不挂这) */
     @TableField("content")
     @ApiModelProperty(value = "推进记录")
     private String content;
 
-    /** 最近一次推进动作 */
+    /** 最近一次动作 1推进 2撤回 3开单 */
     @TableField("last_action")
-    @ApiModelProperty(value = "最近一次推进动作")
+    @ApiModelProperty(value = "最近一次动作 1推进 2撤回 3开单")
     private String lastAction;
 
     /** 删除标记 0正常 1删除 */
