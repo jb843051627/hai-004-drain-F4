@@ -197,3 +197,60 @@ CREATE TABLE IF NOT EXISTS t_drain_work_order (
   PRIMARY KEY (id),
   KEY idx_site_open (site_no, status, del_flag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='排涝抢险作业单';
+
+-- 抢险作业单：接单(0)->到场布防(1)->处置(2)->撤场(3)->办结销号(4) 五档一道一道走。
+-- 主表只记"现在停在哪一档、什么状态"；每档谁办的、什么时刻、办了什么，全在流水表
+-- t_drain_rescue_step 里逐笔落账，倒着一级级盘得出来。
+-- 销号(1)即终态：主表内容不许再改、整单不许删（本表干脆不提供删除入口），
+-- 确有错漏另开补单（supplement_of 挂回母单），母单一笔不动。
+CREATE TABLE IF NOT EXISTS t_drain_rescue_order (
+  id bigint NOT NULL COMMENT '主键',
+  biz_no varchar(64) DEFAULT NULL COMMENT '抢险作业单号',
+  site_no varchar(64) DEFAULT NULL COMMENT '抢险所压泵站编号',
+  stage int DEFAULT NULL COMMENT '当前档 0接单 1到场布防 2处置 3撤场 4办结销号',
+  status int DEFAULT NULL COMMENT '作业单状态 0在办 1已销号(终态) 2退回重办(停在退回档,重办后才许再推进)',
+  supplement_of bigint DEFAULT NULL COMMENT '补单所补母单主键(仅补单有值;母单本身此列为空)',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_site_open (site_no, status, del_flag),
+  KEY idx_supplement_of (supplement_of)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢险作业单(五档流转)';
+
+-- 抢险档级流水：每挪一档落一笔——哪一档、第几回办、谁办的、什么时刻、办了什么。
+-- 口径：
+-- 1. 同一档同一办次(attempt_no)只许一笔（uk_order_stage_attempt 兜底），
+--    不重办就挪不出第二回——"同一档不许挪第二回"由库唯一键钉死；
+-- 2. 撤回重办：退回目标档的现行办理笔置 void_flag=1 作废（谁撤的、什么时刻、
+--    为什么撤一并记下），作废笔不进单面——不许跟重办后的新记录并排挂在同一
+--    张单上；但行留在库里，倒查/审计翻得到；
+-- 3. 流水只增不改：没有更新办理内容的入口，写错只能撤回作废后重办落新笔；
+-- 4. seq_no 单据全局递增，倒序一拉就是一级级倒着盘。
+CREATE TABLE IF NOT EXISTS t_drain_rescue_step (
+  id bigint NOT NULL COMMENT '主键',
+  order_id bigint NOT NULL COMMENT '抢险作业单主键 t_drain_rescue_order.id',
+  biz_no varchar(64) DEFAULT NULL COMMENT '抢险作业单号(冗余便于台账倒查)',
+  stage int NOT NULL COMMENT '档位 0接单 1到场布防 2处置 3撤场 4办结销号',
+  attempt_no int NOT NULL COMMENT '本档第几回办 首办1 撤回重办一次+1',
+  operator varchar(64) NOT NULL COMMENT '经办人登录名',
+  action int NOT NULL COMMENT '动作 1办理(撤回作废不另起行,看 void_flag/void_by/void_time/void_reason)',
+  detail varchar(500) DEFAULT NULL COMMENT '本档办了什么(办理记录)',
+  op_time datetime NOT NULL COMMENT '经办时刻',
+  seq_no int NOT NULL COMMENT '单据全局时序(倒查排序用)',
+  void_flag int DEFAULT '0' COMMENT '作废标记 0现行 1已作废(撤回重办后不许再挂上单面)',
+  void_by varchar(64) DEFAULT NULL COMMENT '作废经办人(谁撤的)',
+  void_time datetime DEFAULT NULL COMMENT '作废时刻',
+  void_reason varchar(500) DEFAULT NULL COMMENT '作废缘由(撤回批语)',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_order_stage_attempt (order_id, stage, attempt_no),
+  KEY idx_order_seq (order_id, seq_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='抢险作业单档级流水';

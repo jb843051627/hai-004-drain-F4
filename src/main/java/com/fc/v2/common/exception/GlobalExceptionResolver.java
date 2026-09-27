@@ -126,6 +126,16 @@ public class GlobalExceptionResolver{
     {
         return AjaxResult.error(e.getMessage());
     }
+
+    /**
+     * 抢险作业单流转业务规则异常（跨档抢挪、同档挪第二回、销号后再动、退回不重办就溜、
+     * 作废记录与新记录并排挂单、母单上直接改补等红线）
+     */
+    @ExceptionHandler(DrainRescueException.class)
+    public AjaxResult drainRescueException(DrainRescueException e)
+    {
+        return AjaxResult.error(e.getMessage());
+    }
     
     /**
      * 拦截未知的运行时异常
